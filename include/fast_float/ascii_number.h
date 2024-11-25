@@ -140,8 +140,7 @@ parse_eight_digits_unrolled(UC const *chars) noexcept {
 // credit @aqrit
 fastfloat_really_inline constexpr bool
 is_made_of_eight_digits_fast(uint64_t val) noexcept {
-  return !((((val + 0x4646464646464646) | (val - 0x3030303030303030)) &
-            0x8080808080808080));
+  return !((((val + 0x7676767676767676) | (val)) & 0x8080808080808080));
 }
 
 #ifdef FASTFLOAT_HAS_SIMD
