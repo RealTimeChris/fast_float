@@ -2,6 +2,8 @@
 #define USING_COUNTERS
 #include "event_counter.h"
 #endif
+
+#include "event_counter.h"
 #include <algorithm>
 #include "fast_float/fast_float.h"
 #include <chrono>
@@ -148,7 +150,9 @@ time_it_ns(std::vector<std::basic_string<CharT>> &lines, T const &function,
     }
     t2 = std::chrono::high_resolution_clock::now();
     double dif =
-        std::chrono::duration_cast<std::chrono::nanoseconds>(t2 - t1).count();
+        std::chrono::duration_cast<
+            std::chrono::duration<double, std::nano>>(t2 - t1)
+            .count();
     average += dif;
     min_value = min_value < dif ? min_value : dif;
   }
@@ -190,18 +194,18 @@ void process(std::vector<std::string> &lines, size_t volume) {
   size_t repeat = 100;
   double volumeMB = volume / (1024. * 1024.);
   std::cout << "ASCII volume = " << volumeMB << " MB " << std::endl;
-  pretty_print(volume, lines.size(), "fastfloat (64)",
+  pretty_print(static_cast<double>(volume), lines.size(), "fastfloat (64)",
                time_it_ns(lines, findmax_fastfloat64<char>, repeat));
-  pretty_print(volume, lines.size(), "fastfloat (32)",
+  pretty_print(static_cast<double>(volume), lines.size(), "fastfloat (32)",
                time_it_ns(lines, findmax_fastfloat32<char>, repeat));
 
   std::vector<std::u16string> lines16 = widen(lines);
   volume = 2 * volume;
   volumeMB = volume / (1024. * 1024.);
   std::cout << "UTF-16 volume = " << volumeMB << " MB " << std::endl;
-  pretty_print(volume, lines.size(), "fastfloat (64)",
+  pretty_print(static_cast<double>(volume), lines.size(), "fastfloat (64)",
                time_it_ns(lines16, findmax_fastfloat64<char16_t>, repeat));
-  pretty_print(volume, lines.size(), "fastfloat (32)",
+  pretty_print(static_cast<double>(volume), lines.size(), "fastfloat (32)",
                time_it_ns(lines16, findmax_fastfloat32<char16_t>, repeat));
 }
 
