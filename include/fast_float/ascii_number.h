@@ -127,16 +127,6 @@ parse_eight_digits_unrolled(uint64_t val) {
   return uint32_t(val);
 }
 
-fastfloat_really_inline FASTFLOAT_CONSTEXPR14 uint32_t
-parse_eight_digits_unrolled_no_sub(uint64_t val) {
-  constexpr uint64_t mask = 0x000000FF000000FF;
-  constexpr uint64_t mul1 = 0x000F424000000064; // 100 + (1000000ULL << 32)
-  constexpr uint64_t mul2 = 0x0000271000000001; // 1 + (10000ULL << 32)
-  val = (val * 10) + (val >> 8);                // val = (val * 2561) >> 8;
-  val = (((val & mask) * mul1) + (((val >> 16) & mask) * mul2)) >> 32;
-  return uint32_t(val);
-}
-
 // Call this if chars are definitely 8 digits.
 template <typename UC>
 fastfloat_really_inline FASTFLOAT_CONSTEXPR20 uint32_t
@@ -157,6 +147,16 @@ is_made_of_eight_digits_fast(uint64_t val) noexcept {
 fastfloat_really_inline constexpr bool
 is_made_of_eight_digits_no_sub(uint64_t val) noexcept {
   return !((((val + 0x7676767676767676) | (val)) & 0x8080808080808080));
+}
+
+fastfloat_really_inline FASTFLOAT_CONSTEXPR14 uint32_t
+parse_eight_digits_unrolled_no_sub(uint64_t val) {
+  constexpr uint64_t mask = 0x000000FF000000FF;
+  constexpr uint64_t mul1 = 0x000F424000000064; // 100 + (1000000ULL << 32)
+  constexpr uint64_t mul2 = 0x0000271000000001; // 1 + (10000ULL << 32)
+  val = (val * 10) + (val >> 8);                // val = (val * 2561) >> 8;
+  val = (((val & mask) * mul1) + (((val >> 16) & mask) * mul2)) >> 32;
+  return uint32_t(val);
 }
 
 #ifdef FASTFLOAT_HAS_SIMD
@@ -257,12 +257,6 @@ loop_parse_if_digits(UC const *&p, UC const *const pend, uint64_t &i) {
              p, i)) { // in rare cases, this will overflow, but that's ok
     p += 8;
   }
-
-  while ((p != pend) && is_integer(*p)) {
-    uint32_t digit = uint32_t(*p - UC('0'));
-    ++p;
-    i = i * 10 + digit; // in rare cases, this will overflow, but that's ok
-  }
 }
 
 fastfloat_really_inline FASTFLOAT_CONSTEXPR20 void
@@ -272,12 +266,6 @@ loop_parse_if_digits(char const *&p, char const *const pend, uint64_t &i) {
                              is_made_of_eight_digits_no_sub(val))) {
     i = i * 100000000 + parse_eight_digits_unrolled_no_sub(val);
     p += 8;
-  }
-
-  while ((p != pend) && is_integer(*p)) {
-    uint8_t digit = uint8_t(*p - char('0'));
-    ++p;
-    i = i * 10 + digit; // in rare cases, this will overflow, but that's ok
   }
 }
 
@@ -397,6 +385,13 @@ parse_number_string(UC const *p, UC const *pend,
     // can occur at most twice without overflowing, but let it occur more, since
     // for integers with many digits, digit parsing is the primary bottleneck.
     loop_parse_if_digits(p, pend, i);
+
+    while ((p != pend) && is_integer(*p)) {
+      uint8_t digit = uint8_t(*p - char('0'));
+      ++p;
+      i = i * 10 + digit; // in rare cases, this will overflow, but that's ok
+    }
+
     exponent = before - p;
     answer.fraction = span<UC const>(before, size_t(p - before));
     digit_count -= exponent;
