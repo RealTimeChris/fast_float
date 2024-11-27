@@ -879,6 +879,40 @@ operator^=(chars_format &lhs, chars_format rhs) noexcept {
   return lhs = (lhs ^ rhs);
 }
 
+#if defined(_MSC_VER)
+#if _MSC_VER >= 1900
+#if _MSC_VER >= 1910
+#else
+#define CPP14_NOT_SUPPORTED
+#endif
+#else
+#define CPP14_NOT_SUPPORTED
+#endif
+#elif __cplusplus < 201402L
+#define CPP14_NOT_SUPPORTED
+#endif
+
+#ifndef CPP14_NOT_SUPPORTED
+#define FASTFLOAT_CONDITIONAL_T(condition, true_t, false_t)                    \
+  std::conditional_t<condition, true_t, false_t>
+#else
+template <bool condition, typename true_t, typename false_t>
+struct conditional {
+  typedef false_t type;
+};
+
+template <typename true_t, typename false_t>
+struct conditional<true, true_t, false_t> {
+  typedef true_t type;
+};
+
+template <bool condition, typename true_t, typename false_t>
+using conditional_t = typename conditional<condition, true_t, false_t>::type;
+
+#define FASTFLOAT_CONDITIONAL_T(condition, true_t, false_t)                    \
+  conditional_t<condition, true_t, false_t>
+#endif
+
 namespace detail {
 // adjust for deprecated feature macros
 constexpr chars_format adjust_for_feature_macros(chars_format fmt) {

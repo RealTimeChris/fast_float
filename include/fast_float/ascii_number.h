@@ -28,11 +28,20 @@ template <typename UC> fastfloat_really_inline constexpr bool has_simd_opt() {
 #endif
 }
 
+template <typename value_type> struct get_equal_sized_uint {
+  using type = FASTFLOAT_CONDITIONAL_T(
+      sizeof(value_type) == 4, uint32_t,
+      FASTFLOAT_CONDITIONAL_T(sizeof(value_type) == 2, uint16_t, uint8_t));
+};
+
+template <typename value_type>
+using get_equal_sized_uint_t = typename get_equal_sized_uint<value_type>::type;
+
 // Next function can be micro-optimized, but compilers are entirely
 // able to optimize it well.
 template <typename UC>
 fastfloat_really_inline constexpr bool is_integer(UC c) noexcept {
-  return static_cast<uint32_t>(c - UC('0')) < 10;
+  return static_cast<get_equal_sized_uint_t<UC>>(c - UC('0')) < 10;
 }
 
 fastfloat_really_inline constexpr uint64_t byteswap(uint64_t val) {
@@ -224,9 +233,7 @@ bool simd_parse_if_eight_digits_unrolled(UC const *, uint64_t &) {
 template <typename UC, FASTFLOAT_ENABLE_IF(!std::is_same<UC, char>::value) = 0>
 fastfloat_really_inline FASTFLOAT_CONSTEXPR20 void
 loop_parse_if_eight_digits(UC const *&p, UC const *const pend, uint64_t &i) {
-  FASTFLOAT_IF_CONSTEXPR(!has_simd_opt<UC>()) {
-    return;
-  }
+  FASTFLOAT_IF_CONSTEXPR(!has_simd_opt<UC>()) { return; }
   while (((pend - p) >= 8) &&
          simd_parse_if_eight_digits_unrolled(
              p, i)) { // in rare cases, this will overflow, but that's ok
@@ -249,9 +256,7 @@ loop_parse_if_eight_digits(char const *&p, char const *const pend,
 template <typename UC, FASTFLOAT_ENABLE_IF(!std::is_same<UC, char>::value) = 0>
 fastfloat_really_inline FASTFLOAT_CONSTEXPR20 void
 loop_parse_if_digits(UC const *&p, UC const *const pend, uint64_t &i) {
-  FASTFLOAT_IF_CONSTEXPR(!has_simd_opt<UC>()) {
-    return;
-  }
+  FASTFLOAT_IF_CONSTEXPR(!has_simd_opt<UC>()) { return; }
   while (((pend - p) >= 8) &&
          simd_parse_if_eight_digits_unrolled(
              p, i)) { // in rare cases, this will overflow, but that's ok
@@ -387,7 +392,7 @@ parse_number_string(UC const *p, UC const *pend,
     loop_parse_if_digits(p, pend, i);
 
     while ((p != pend) && is_integer(*p)) {
-      uint8_t digit = uint8_t(*p - char('0'));
+      uint8_t digit = uint8_t(*p - UC('0'));
       ++p;
       i = i * 10 + digit; // in rare cases, this will overflow, but that's ok
     }
