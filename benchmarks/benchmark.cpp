@@ -4,6 +4,7 @@
 #include "counters/event_counter.h"
 #include <algorithm>
 #include "fast_float/fast_float.h"
+#include <jsonifier>
 #include <chrono>
 #include <climits>
 #include <cmath>
@@ -48,6 +49,47 @@ double findmax_fastfloat32(std::vector<std::basic_string<CharT>> &s) {
     answer = answer > x ? answer : x;
   }
   return answer;
+}
+
+bool is_json_number(const std::string &st) {
+  size_t i = 0;
+  if (i < st.size() && st[i] == '-') {
+    ++i;
+  }
+  return i + 1 >= st.size() || st[i] != '0' || st[i + 1] < '0' ||
+         st[i + 1] > '9';
+}
+
+template <typename T>
+double findmax_jsonifier(std::vector<std::string> &s) {
+  T answer = 0;
+  T x = 0;
+  for (auto &st : s) {
+    auto p = jsonifier::internal::float_parser<T>::parseFloat(
+        x, st.data(), st.data() + st.size());
+    if (p == nullptr) {
+      throw std::runtime_error("bug in findmax_jsonifier");
+    }
+    answer = answer > x ? answer : x;
+  }
+  return answer;
+}
+
+template <typename T> bool verify_jsonifier(std::vector<std::string> &s) {
+  for (auto &st : s) {
+    T expected = 0;
+    T actual = 0;
+    fast_float::from_chars(st.data(), st.data() + st.size(), expected);
+    auto p = jsonifier::internal::float_parser<T>::parseFloat(
+        actual, st.data(), st.data() + st.size());
+    if (p == nullptr || std::memcmp(&expected, &actual, sizeof(T)) != 0) {
+      std::cerr << "MISMATCH on '" << st << "': fast_float="
+                << std::setprecision(17) << expected
+                << " jsonifier=" << actual << std::endl;
+      return false;
+    }
+  }
+  return true;
 }
 
 counters::event_collector collector{};
@@ -195,6 +237,29 @@ void process(std::vector<std::string> &lines, size_t volume) {
                time_it_ns(lines, findmax_fastfloat64<char>, repeat));
   pretty_print(volume, lines.size(), "fastfloat (32)",
                time_it_ns(lines, findmax_fastfloat32<char>, repeat));
+  std::vector<std::string> json_lines;
+  size_t json_volume = 0;
+  for (auto &st : lines) {
+    if (is_json_number(st)) {
+      json_lines.push_back(st);
+      json_volume += st.size();
+    }
+  }
+  std::cout << "# JSON-valid subset: " << json_lines.size() << " lines ("
+            << (lines.size() - json_lines.size()) << " non-JSON skipped)"
+            << std::endl;
+  if (verify_jsonifier<double>(json_lines) &&
+      verify_jsonifier<float>(json_lines)) {
+    std::cout << "# jsonifier results bit-identical to fast_float" << std::endl;
+  }
+  pretty_print(json_volume, json_lines.size(), "fastfloat JSON-subset (64)",
+               time_it_ns(json_lines, findmax_fastfloat64<char>, repeat));
+  pretty_print(json_volume, json_lines.size(), "fastfloat JSON-subset (32)",
+               time_it_ns(json_lines, findmax_fastfloat32<char>, repeat));
+  pretty_print(json_volume, json_lines.size(), "jsonifier (64)",
+               time_it_ns(json_lines, findmax_jsonifier<double>, repeat));
+  pretty_print(json_volume, json_lines.size(), "jsonifier (32)",
+               time_it_ns(json_lines, findmax_jsonifier<float>, repeat));
 
   std::vector<std::u16string> lines16 = widen(lines);
   volume = 2 * volume;

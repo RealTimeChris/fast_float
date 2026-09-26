@@ -17,7 +17,13 @@ target_link_libraries(bench_uint16 PRIVATE counters::counters)
 
 set_property(
     TARGET realbenchmark
-    PROPERTY CXX_STANDARD 17)
+    PROPERTY CXX_STANDARD 20)
+target_include_directories(realbenchmark PRIVATE ${PROJECT_SOURCE_DIR}/jsonifier/include)
+if(MSVC)
+  target_compile_options(realbenchmark PRIVATE /arch:AVX2 /Zc:preprocessor)
+else()
+  target_compile_options(realbenchmark PRIVATE -march=native)
+endif()
 set_property(
     TARGET bench_ip
     PROPERTY CXX_STANDARD 17)
